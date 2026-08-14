@@ -19,7 +19,7 @@ print(f"after drop calls filter: {len(df)}")
 df = df[(df['c_charge_degree'] != 'O')]
 print(f"after charge free filter: {len(df)}")
 
-## drop score_text == 'N/A'
+## filter 4: drop score_text == 'N/A'
 df = df[(df['score_text'] != 'N/A')]
 print(f"after score_charge filter {len(df)}")
 
