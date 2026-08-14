@@ -263,4 +263,4 @@ This project is released under the MIT License (see `LICENSE`). The COMPAS datas
 
 ---
 
-*Independent research project by [Your Name].*
+*Independent research project by Priyanshi Joshi.*
