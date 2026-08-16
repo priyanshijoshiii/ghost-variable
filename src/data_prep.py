@@ -26,5 +26,8 @@ print(f"after score_charge filter {len(df)}")
 df = pd.get_dummies(df, columns=['sex', 'age_cat', 'c_charge_degree'], drop_first=True)
 print(df.columns.tolist())
 
+## just to understand how the columns in pandas work
+## print(df[['sex_Male', 'age_cat_Greater than 45', 'age_cat_Less than 25']].head(10))
+
 df.to_csv('data/processed/compas_filtered.csv', index = False)
 print("saved filtered dataset")
