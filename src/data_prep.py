@@ -23,5 +23,8 @@ print(f"after charge free filter: {len(df)}")
 df = df[(df['score_text'] != 'N/A')]
 print(f"after score_charge filter {len(df)}")
 
+df = pd.get_dummies(df, columns=['sex', 'age_cat', 'c_charge_degree'], drop_first=True)
+print(df.columns.tolist())
+
 df.to_csv('data/processed/compas_filtered.csv', index = False)
 print("saved filtered dataset")
