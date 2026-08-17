@@ -54,3 +54,10 @@ Where:
 - f_{w,b}(x⁽ⁱ⁾) = the model's predicted probability for the i-th example, i.e. sigmoid(w·x⁽ⁱ⁾ + b)
 - The 1/m and the sum: you're computing this cost for every single training example, then averaging across all of them — one overall number representing "how wrong is the model right now, on average, across the whole dataset"
 - limit is form i = 1 to i = m
+
+## what is y
+- y is your label (also called "target" or "ground truth") — the actual correct answer for each person, not something the model computes, something you already know from the data.
+
+- In your project specifically: y = two_year_recid — for each person, was 1 (they were rearrested within 2 years) or 0 (they weren't). This is real, historical, already-known fact about each person — it's what actually happened, pulled straight from the dataset.
+
+- Why the cost function needs it: the whole point of "cost" is measuring "how wrong is the model." Wrong compared to what? Compared to y — the real answer. The model produces predictions (a guess, a probability between 0 and 1). y is the truth. The cost function compares them and produces a number saying how far off the guess was.
