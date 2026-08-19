@@ -38,6 +38,9 @@
 # print("Final w:", w_final)
 # print("Final b:", b_final)
 
+# what does probabilities >= 0.5 actually produce before .astype(int) touches it? Same pattern as your very first boolean-indexing lesson: it's a True/False array, one per person. E.g. [0.75, 0.3, 0.6] >= 0.5 → [True, False, True].
+# Then .astype(int) converts each: True → 1, False → 0. So [True, False, True] becomes [1, 0, 1].
+
 import numpy as np
 import pandas as pd
 
@@ -108,3 +111,4 @@ sklearn_model.fit(X,y)
 
 print("sklearn coefficients: ", sklearn_model.coef_)   # w
 print("sklearn intercept: ", sklearn_model.intercept_)  # b
+
