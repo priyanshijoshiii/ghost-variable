@@ -132,7 +132,7 @@ compas-fairness-audit/
 │   ├── data_prep.py              # Filtering + feature engineering, mirrors methodology exactly
 │   ├── logistic_regression.py    # From-scratch NumPy implementation (sigmoid, cost, gradient descent, regularization)
 │   ├── evaluate.py                # Confusion matrices, FPR/FNR/calibration by subgroup
-│   ├── audit.py                   # Race-on-score auxiliary regression, odds ratios
+│   ├── audit_regression.py                   # Race-on-score auxiliary regression, odds ratios
 │   └── sklearn_baseline.py        # sklearn comparison model, used only for validation
 ├── notebooks/
 │   ├── 01_eda.ipynb                # Exploratory analysis, score distributions by race
@@ -209,25 +209,33 @@ Or run the notebooks in order (`01_eda.ipynb` → `02_model_training.ipynb` → 
 
 ## Results
 
-*(To be filled in once training and audit are complete.)*
+Model trained via from-scratch batch gradient descent (α = 0.1, 9000 iterations, converged) on the filtered 6,172-row dataset. Inputs: `priors_count` (standardized), `sex_Male`, `age_cat_Greater than 45`, `age_cat_Less than 25`, `c_charge_degree_M`. Label: `two_year_recid`. `race` was never provided to the model — it is used only below, to audit the resulting predictions.
+
+**Model validation:** cost decreased from 0.6931 (baseline, all-zero weights) to 0.6147 after training. From-scratch weights closely match `sklearn.linear_model.LogisticRegression` in both sign and magnitude across all five features (e.g. `priors_count`: 0.805 vs. sklearn's 0.806), confirming a correct implementation.
+
+**Fairness audit**, restricted to Black and white defendants (3,175 and 2,103 of the 6,172 filtered rows respectively — the only two groups with sufficient sample size for reliable subgroup error-rate estimates; see [Limitations](#limitations)):
 
 | Metric | Black defendants | White defendants |
 |---|---|---|
-| False Positive Rate | — | — |
-| False Negative Rate | — | — |
-| Predictive Parity (High-risk bucket) | — | — |
-| Overall Accuracy | — | — |
+| False Positive Rate | 32.96% | 17.17% |
+| False Negative Rate | 33.35% | 59.98% |
+| Overall Accuracy | 66.83% | 66.10% |
 
-| Model | Overall Accuracy | FPR Gap (Black − White) | FNR Gap (Black − White) |
-|---|---|---|---|
-| From-scratch logistic regression | — | — | — |
-| Raw COMPAS score (baseline) | — | — | — |
+Overall accuracy is nearly identical between groups (a 0.7-point gap), while the False Positive Rate is roughly **1.9× higher for Black defendants** and the False Negative Rate is roughly **1.8× higher for white defendants** — errors running in opposite directions, both disadvantaging Black defendants in the way that matters most for real-world harm (more false accusations of risk; more actually-risky white defendants given the benefit of the doubt). This directly reproduces the core disparity reported in ProPublica's 2016 investigation, despite race never being supplied to the model as an input feature.
+
+*An auxiliary odds-ratio regression — predicting COMPAS's own high/low risk category from `race` plus the same controls, to test directly whether race remains predictive after controlling for priors/age/sex — is in progress; results will be added here once complete.*
 
 ---
 
 ## Key Findings
 
-*(To be written after the audit — this section should state plainly which fairness definition the model satisfies, which it violates, and why it cannot satisfy both, per Chouldechova's impossibility result.)*
+**Aggregate accuracy conceals subgroup disparity.** Looking only at overall accuracy (66.83% vs. 66.10%) would lead to the conclusion that the model treats both groups almost identically — that conclusion is wrong, and the error only becomes visible once the confusion matrix is broken apart by race. This is the central methodological lesson of the entire project: accuracy alone is an insufficient fairness check for any classifier making decisions about people.
+
+**Bias persists without race as an input.** The model was trained only on `priors_count`, `sex_Male`, `age_cat`, and `c_charge_degree_M`. It reproduced a large racial disparity in error rates anyway — strong evidence that at least one of these features (most plausibly `priors_count`, given documented disparities in policing intensity and arrest rates by neighborhood) is acting as a proxy for race.
+
+**The disparity is not necessarily evidence the model is "wrong."** A classifier can be well-calibrated to real base-rate differences between groups and still produce unequal false-positive/false-negative rates — this is a mathematical consequence of differing base rates (formalized in Chouldechova, 2017), not automatically a sign of a broken model. Two competing, both-valid fairness definitions — equal error rates vs. predictive parity — cannot generally be satisfied simultaneously when base rates differ. This project demonstrates the disparity; it does not resolve which fairness definition should take precedence, because that is a normative question, not a purely statistical one.
+
+*(Personal reflection to be added once the project is fully complete.)*
 
 ---
 
@@ -242,7 +250,7 @@ Or run the notebooks in order (`01_eda.ipynb` → `02_model_training.ipynb` → 
 
 ## What I Learned
 
-*(Personal reflection section — to be completed after the project. Suggested prompts: What surprised you about the FPR/FNR gap? Did your prediction about proxy variables hold up? Which fairness definition do you now think matters most, and why?)*
+*(Personal reflection section — to be completed after the project)*
 
 ---
 
@@ -263,4 +271,4 @@ This project is released under the MIT License (see `LICENSE`). The COMPAS datas
 
 ---
 
-*Independent research project by Priyanshi Joshi.*
+*Independent research project by [Priyanshi Joshi].*
