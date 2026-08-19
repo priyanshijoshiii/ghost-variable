@@ -246,3 +246,114 @@ Auditing: build a model *not* to use for decisions, but to investigate
 whether an existing system or the data itself contains a hidden pattern
 (e.g. bias). The model's output isn't the point — what you learn by
 breaking it apart afterward (e.g. by race) is the point.
+
+## Threshold — converting probabilities to decisions
+
+Sigmoid outputs a probability (0 to 1), not a decision. To audit the
+model, real yes/no predictions are needed — standard threshold is 0.5.
+
+    predicted_labels = (probabilities >= 0.5).astype(int)
+
+`probabilities >= 0.5` gives a True/False array (same boolean-indexing
+pattern as everywhere else) — True where probability crosses the
+threshold. `.astype(int)` converts True→1, False→0. This is NOT
+rounding to the nearest integer — every value above the threshold
+becomes exactly 1, every value below becomes exactly 0, regardless of
+how close to 0.5 it was (0.51 and 0.99 are treated identically).
+
+---
+
+## Fairness audit — FPR / FNR / accuracy by race, implementation notes
+
+`race` was dropped when building X (never used as a model input) but
+kept separately from the original df for auditing predictions after
+the fact.
+
+Boolean indexing pattern, extended to 3 stacked conditions with `&`:
+
+    black_not_reoffend = (race == 'African-American') & (y == 0)
+    black_fp = black_not_reoffend & (predicted_labels == 1)
+    fpr_black = black_fp.sum() / black_not_reoffend.sum()
+
+- Each condition alone gives True/False per person.
+- `&` requires all conditions true simultaneously (same as the
+  screening-window filter in data_prep.py).
+- `.sum()` on a True/False array counts how many are True (True=1,
+  False=0 in NumPy) — so `black_not_reoffend.sum()` = total count of
+  Black defendants who didn't reoffend; `black_fp.sum()` = how many of
+  those were false positives.
+- Dividing gives the rate: FPR = false positives ÷ everyone eligible to
+  be a false positive.
+
+Same structure mirrored for FNR, swapping `y == 0` → `y == 1` and
+`predicted_labels == 1` → `predicted_labels == 0`.
+
+## Accuracy by race — array indexing with a boolean mask
+
+    black_acc = (predicted_labels[race == 'African-American'] == y[race == 'African-American']).mean()
+
+- `predicted_labels[race == 'African-American']` — filters the
+  predictions array down to only Black defendants (same mask-indexing
+  idea as `df[condition]`, just applied to a NumPy array).
+- `y[race == 'African-American']` — same filter applied to the real
+  outcomes, so both arrays stay aligned person-for-person.
+- Comparing the two filtered arrays element-by-element gives True where
+  the prediction matched reality.
+- `.mean()` = `.sum() / count` = fraction of True values = accuracy.
+
+---
+
+## dtype bug — object arrays and np.exp
+
+Building X from a DataFrame with mixed types (decimals + True/False)
+produced a NumPy array with dtype `object` instead of a proper numeric
+type. `np.exp` (inside sigmoid) failed on object arrays with a
+confusing error (`'float' object has no attribute 'exp'`).
+
+Fix: `X = X.to_numpy().astype(float)` — forces every value into proper
+float64, converting True/False into 1.0/0.0 along the way. Diagnosed by
+checking `X.dtype` before assuming the cause.
+
+---
+
+## Race sample sizes — why only Black vs. white were compared
+
+    African-American    3175
+    Caucasian            2103
+    Hispanic              509
+    Other                 343
+    Asian                  31
+    Native American        11
+
+Black and white defendants make up ~87% of the dataset combined and are
+large enough for statistically reliable FPR/FNR estimates. Smaller
+groups (especially Native American, n=11) are too small — a single
+misclassification would swing the rate by 10%+, making any computed
+rate unreliable rather than meaningful. This mirrors why ProPublica's
+own analysis centers on the Black-white comparison — not an arbitrary
+choice, a sample-size constraint.
+
+---
+
+## Real results (9000 iterations, alpha=0.1)
+
+| Metric | Black | White |
+|---|---|---|
+| FPR | 32.96% | 17.17% |
+| FNR | 33.35% | 59.98% |
+| Accuracy | 66.83% | 66.10% |
+
+Overall accuracy is nearly identical between groups (~0.7% gap) while
+FPR and FNR differ by ~1.9x and ~1.8x respectively, in opposite
+directions. This is the central finding: aggregate accuracy conceals
+the disparity entirely — it's only visible once the confusion matrix
+is broken apart by subgroup. Directly reproduces ProPublica's original
+2016 finding, from a model that never received race as an input
+feature — meaning the disparity is being carried through a proxy
+(most likely priors_count, per the base-rate/policing discussion
+above).
+
+sklearn validation: from-scratch weights matched sklearn's
+LogisticRegression coefficients in sign and closely in magnitude
+across all 5 features (e.g. priors_count: 0.805 vs 0.806), confirming
+correct implementation.
